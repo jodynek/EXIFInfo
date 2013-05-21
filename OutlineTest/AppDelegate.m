@@ -26,6 +26,8 @@
   [_outlineView registerForDraggedTypes:[NSArray arrayWithObjects: NSStringPboardType, NSFilenamesPboardType, NSURLPboardType, nil]];
   [_outlineView setDraggingSourceOperationMask:NSDragOperationEvery forLocal:YES];
   [_outlineView setDraggingSourceOperationMask:NSDragOperationEvery forLocal:NO];
+  
+  [self loadData:[NSURL fileURLWithPath:@"/Users/jodynek/Pictures/BYT 4.jpg"]];
 }
 
 
@@ -69,10 +71,13 @@
   if (prop == nil)
   {
     //item is nil when the outline view wants to inquire for root level items
-    return [arrEXIF count];
+    return 1;
+  } else {
+    if ([prop values] != nil)
+      return [[prop values] count];
+    else
+      return [arrEXIF count] - 1;
   }
-  if ([prop values] != nil)
-    return [[prop values] count];
   return 0;
 }
 
@@ -81,7 +86,7 @@
   if ([item isKindOfClass:[CProperties class]])
   {
     CProperties *prop = item;
-    if ([prop values] != nil)
+    if ([prop values] != nil || [prop isRoot])
     {
       return YES;
     } else {
@@ -94,13 +99,18 @@
 - (id)outlineView:(NSOutlineView *)outlineView child:(NSInteger)index ofItem:(id)item
 {
   CProperties *prop = item;
+  if ([arrEXIF count] == 0)
+    return nil;
   if (prop == nil)
   { //item is nil when the outline view wants to inquire for root level items
-    return [arrEXIF objectAtIndex:index];
-  }
-  if ([prop values] != nil)
-  {
-    return [[prop values] objectAtIndex:index];
+    return [arrEXIF objectAtIndex:0];
+  } else {
+    if ([prop values] != nil)
+    {
+      return [[prop values] objectAtIndex:index];
+    } else {
+      return [arrEXIF objectAtIndex:index + 1];
+    }
   }
   return nil;
 }
@@ -113,13 +123,15 @@
     CProperties *prop = item;
     if ([[tableColumn identifier] isEqualToString:@"sKey"])
     {
+      if ([prop values] != nil && [prop isRoot])
+        return [NSString stringWithFormat:@"%@ (%li values)",[prop sKey], [[item values] count]];
       if ([prop values] != nil )
       {
         // ... then write something informative in the header (number of values)
         return [NSString stringWithFormat:@"%@ (%li values)",[prop sKey], [[item values] count]];
       }
       return [prop sKey]; // ...and, if we actually have a value, return the value
-    } else {
+    } else if ([[tableColumn identifier] isEqualToString:@"sValue"]) {
       if ([prop values] == nil)
       {
         return [prop sValue]; // return value without children
@@ -137,12 +149,13 @@
 {
   [self exif:url];
   [_outlineView reloadData];
+  // expand first row in tree 
+  [_outlineView expandItem:[_outlineView itemAtRow:0] expandChildren:NO];
   [_window setTitle:[NSString stringWithFormat:@"EXIF Info - %@", [url path]]];
 }
 
 - (IBAction)btnDisplayClicked:(id)sender
 {
-  //[self exif:[NSURL fileURLWithPath:@"/Users/jodynek/Pictures/BYT 4.jpg"]];
   NSOpenPanel *panel;
   panel = [NSOpenPanel openPanel];
   [panel setFloatingPanel:YES];
@@ -161,6 +174,11 @@
             outputArray:(NSMutableArray *)outputArray
 {
   [outputArray removeAllObjects];
+  CProperties *propRoot = [[CProperties alloc] init];
+  [propRoot setIsRoot:TRUE];
+  [propRoot setSKey:@"EXIF"];
+  [outputArray addObject: propRoot];
+  
   for(NSString *key in inputArray)
   {
     CProperties *prop = [[CProperties alloc] init];

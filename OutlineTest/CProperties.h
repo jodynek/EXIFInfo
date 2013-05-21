@@ -13,8 +13,10 @@
   NSString *_sKey;
   NSString *_sValue;
   NSArray *_values;
+  BOOL _isRoot;
 }
 @property (nonatomic, copy) NSArray* values;
 @property (nonatomic, copy) NSString *sKey;
 @property (nonatomic, copy) NSString *sValue;
+@property (readwrite) BOOL isRoot;
 @end
