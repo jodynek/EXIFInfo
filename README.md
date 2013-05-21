@@ -1,4 +1,4 @@
-OutlineTest
+EXIFInfo
 ===========
 
-NSOutlineView test project only. For studying purposes.
+Simple program for displaying EXIF informations from image.
