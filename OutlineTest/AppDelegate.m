@@ -19,6 +19,7 @@
 
   // datasource
   arrEXIF = [[NSMutableArray alloc] init];
+  arrIPTC = [[NSMutableArray alloc] init];
   [_outlineView setDelegate:self];
   [_outlineView setDataSource:self];
 
@@ -27,7 +28,7 @@
   [_outlineView setDraggingSourceOperationMask:NSDragOperationEvery forLocal:YES];
   [_outlineView setDraggingSourceOperationMask:NSDragOperationEvery forLocal:NO];
   
-  [self loadData:[NSURL fileURLWithPath:@"/Users/jodynek/Pictures/BYT 4.jpg"]];
+  [self loadData:[NSURL fileURLWithPath:@"/Users/jodynek/Pictures/Panorama.jpg"]];
 }
 
 
@@ -71,12 +72,18 @@
   if (prop == nil)
   {
     //item is nil when the outline view wants to inquire for root level items
-    return 1;
+    // we have 2 root items - EXIF & IPTC
+    return 2;
   } else {
     if ([prop values] != nil)
       return [[prop values] count];
     else
-      return [arrEXIF count] - 1;
+    {
+      if ([[prop sKey] isEqualToString:@"EXIF"])
+        return [arrEXIF count] - 1;
+      else
+        return [arrIPTC count] - 1;
+    }
   }
   return 0;
 }
@@ -99,17 +106,29 @@
 - (id)outlineView:(NSOutlineView *)outlineView child:(NSInteger)index ofItem:(id)item
 {
   CProperties *prop = item;
-  if ([arrEXIF count] == 0)
-    return nil;
+  if ([[prop sKey] isEqualToString:@"EXIF"])
+  {
+    if ([arrEXIF count] == 0)
+      return nil;
+  } else {
+    if ([arrIPTC count] == 0)
+      return nil;
+  }
   if (prop == nil)
   { //item is nil when the outline view wants to inquire for root level items
-    return [arrEXIF objectAtIndex:0];
+    if (index == 0)
+      return [arrEXIF objectAtIndex:0];
+    else if (index == 1)
+      return [arrIPTC objectAtIndex:0];
   } else {
     if ([prop values] != nil)
     {
       return [[prop values] objectAtIndex:index];
     } else {
-      return [arrEXIF objectAtIndex:index + 1];
+      if ([[prop sKey] isEqualToString:@"EXIF"])
+        return [arrEXIF objectAtIndex:index + 1];
+      else
+        return [arrIPTC objectAtIndex:index + 1];
     }
   }
   return nil;
@@ -150,7 +169,9 @@
   [self exif:url];
   [_outlineView reloadData];
   // expand first row in tree 
-  [_outlineView expandItem:[_outlineView itemAtRow:0] expandChildren:NO];
+  [_outlineView expandItem:nil expandChildren:YES];
+//  [_outlineView expandItem:[_outlineView itemAtRow:0] expandChildren:NO];
+//  [_outlineView expandItem:[_outlineView itemAtRow:[arrEXIF count] + 1] expandChildren:NO];
   [_window setTitle:[NSString stringWithFormat:@"EXIF Info - %@", [url path]]];
 }
 
@@ -172,13 +193,15 @@
 
 - (void)fillCustomArray:(NSArray *)inputArray
             outputArray:(NSMutableArray *)outputArray
+               rootItem:(NSString *)rootItem
 {
   [outputArray removeAllObjects];
+  // for root items
   CProperties *propRoot = [[CProperties alloc] init];
   [propRoot setIsRoot:TRUE];
-  [propRoot setSKey:@"EXIF"];
+  [propRoot setSKey:rootItem];
   [outputArray addObject: propRoot];
-  
+  // child items
   for(NSString *key in inputArray)
   {
     CProperties *prop = [[CProperties alloc] init];
@@ -188,12 +211,8 @@
       if ([value isKindOfClass:[NSArray class]])
       {
         NSArray *subArray = [[NSArray alloc] initWithArray:(NSArray *)value];
-        for(NSString *subKey in subArray)
-        {
-          //NSLog(@"SUBobj: %@", subKey);
-        }
-        [prop setSKey:key];
         [prop setValues:subArray];
+        [prop setSKey:key];
       } else {
         [prop setSKey:key];
         [prop setSValue:value];
@@ -204,7 +223,7 @@
   }
 }
 
-- (NSArray*) exif : (NSURL *) url
+- (void) exif:(NSURL *) url
 {
   CGImageSourceRef source = CGImageSourceCreateWithURL( (__bridge CFURLRef) url,NULL);
   if (!source)
@@ -216,28 +235,20 @@
                      didEndSelector:nil
                         contextInfo:&response];
     NSLog(@"***Could not create image source ***");
-    return nil;
+    return;
   }
   //get all the metadata in the image
   NSDictionary *metadata = (__bridge NSDictionary *) CGImageSourceCopyPropertiesAtIndex(source,0,NULL);
+
   //get all the metadata EXIF in the image
   NSArray *exif = [metadata valueForKey:@"{Exif}"];
   //NSLog(@"AnnotationProfil: Exif -> %@", exif);
-  if (exif == nil)
-  {
-    int response;
-    NSAlert *alert = [NSAlert alertWithMessageText:@"No EXIF information in image !" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@""];
-    [alert beginSheetModalForWindow:[self window]
-                      modalDelegate:self
-                     didEndSelector:nil
-                        contextInfo:&response];
-  }
-  [self fillCustomArray:exif outputArray:arrEXIF];
+  [self fillCustomArray:exif outputArray:arrEXIF rootItem:@"EXIF"];
   
   //get all the metadata IPTC in the image
   NSArray *iptc = [metadata valueForKey:@"{IPTC}"];
   NSLog(@"AnnotationProfil: IPTC -> %@",iptc);
-  return exif;
+  [self fillCustomArray:iptc outputArray:arrIPTC rootItem:@"IPTC"];
 }
 
 @end
